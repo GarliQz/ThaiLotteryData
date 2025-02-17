@@ -67,13 +67,45 @@ const validateJson = (jsonData: any): jsonData is LotteryResponse => {
 
 // Function to transform JSON
 const transformJson = (jsonData: LotteryResponse) => {
+    // return {
+    //     lotteryDate: jsonData.response.result.date,
+    //     prizes: Object.entries(jsonData.response.result.data).map(([category, prize]) => ({
+    //         category,
+    //         price: prize.price,
+    //         numbers: prize.number.map(n => ({ round: n.round, value: n.value }))
+    //     }))
+    // };
+    // return {
+    //     lotteryDate: jsonData.response.result.date,
+    //     prizes: Object.entries(jsonData.response.result.data).reduce((acc, [category, prize]) => {
+    //         acc[category] = prize.number.map(n => ({
+    //             price: prize.price,
+    //             number: n.value
+    //         }));
+    //         return acc;
+    //     }, {} as Record<string, { price: string; number: string }[]>)
+    // };
+    // return {
+    //     lotteryDate: jsonData.response.result.date,
+    //     prizes: Object.fromEntries(
+    //         Object.entries(jsonData.response.result.data).map(([category, prize]) => [
+    //             category,
+    //             {
+    //                 price: prize.price,
+    //                 numbers: prize.number.map(n => n.value) // Extracting only values
+    //             }
+    //         ])
+    //     )
+    // };
     return {
         lotteryDate: jsonData.response.result.date,
-        prizes: Object.entries(jsonData.response.result.data).map(([category, prize]) => ({
-            category,
-            price: prize.price,
-            numbers: prize.number.map(n => ({ round: n.round, value: n.value }))
-        }))
+        prizes: Object.entries(jsonData.response.result.data).reduce((acc, [category, prize]) => {
+            acc[category] = {
+                price: prize.price,
+                numbers: prize.number.map(n => ({ round: n.round, value: n.value }))
+            };
+            return acc;
+        }, {} as Record<string, { price: string; numbers: { round: number; value: string }[] }>)
     };
 };
 
