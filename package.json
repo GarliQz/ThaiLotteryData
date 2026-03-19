@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "generate": "tsx generate-static.ts"
+  },
   "dependencies": {
     "ajv": "^8.17.1",
     "fs-extra": "^11.3.0",

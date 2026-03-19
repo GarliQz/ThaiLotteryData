@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Thai Lottery Heatmap</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    /* ── Design tokens — dark (default) ── */
+    :root {
+      --bg:      #0d1117;
+      --surface: #161b22;
+      --surface2:#21262d;
+      --border:  #30363d;
+      --text:    #e6edf3;
+      --muted:   #7d8590;
+      --accent:  #f78166;
+      --green:   #56d364;
+      --blue:    #58a6ff;
+      --purple:  #bc8cff;
+      --radius:  12px;
+      --max-w:   1400px;
+      /* nb hover/active hard-coded colours become variables */
+      --nb-hover-bg: #1a2942;
+      --nb-hover-border: var(--blue);
+      --nb-active-bg: #2d1a1a;
+      --row-hover-bg: #1a2942;
+      --row-hl-bg: #2d1a1a;
+      --tip-bg: #1c2128;
+      --close-hover-bg: #2d1a1a;
+      color-scheme: dark;
+    }
+
+    /* ── Light theme ── */
+    :root[data-theme="light"] {
+      --bg:      #f6f8fa;
+      --surface: #ffffff;
+      --surface2:#f0f3f6;
+      --border:  #d0d7de;
+      --text:    #1f2328;
+      --muted:   #57606a;
+      --accent:  #cf222e;
+      --green:   #1a7f37;
+      --blue:    #0969da;
+      --purple:  #8250df;
+      --nb-hover-bg: #dbeafe;
+      --nb-hover-border: var(--blue);
+      --nb-active-bg: #fde8ea;
+      --row-hover-bg: #dbeafe;
+      --row-hl-bg: #fde8ea;
+      --tip-bg: #ffffff;
+      --close-hover-bg: #fde8ea;
+      color-scheme: light;
+    }
+
+    /* ── System theme: respect OS preference when theme=system ── */
+    @media (prefers-color-scheme: light) {
+      :root[data-theme="system"] {
+        --bg:      #f6f8fa;
+        --surface: #ffffff;
+        --surface2:#f0f3f6;
+        --border:  #d0d7de;
+        --text:    #1f2328;
+        --muted:   #57606a;
+        --accent:  #cf222e;
+        --green:   #1a7f37;
+        --blue:    #0969da;
+        --purple:  #8250df;
+        --nb-hover-bg: #dbeafe;
+        --nb-hover-border: var(--blue);
+        --nb-active-bg: #fde8ea;
+        --row-hover-bg: #dbeafe;
+        --row-hl-bg: #fde8ea;
+        --tip-bg: #ffffff;
+        --close-hover-bg: #fde8ea;
+        color-scheme: light;
+      }
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0 16px 32px;
+    }
+
+    /* ── Centered container ── */
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 20px 0 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    header h1 {
+      font-size: clamp(18px, 3vw, 26px);
+      font-weight: 700;
+      background: linear-gradient(135deg, #f78166, #bc8cff, #58a6ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -.5px;
+    }
+    .gen-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .gen-badge b { color: var(--green); font-weight: 600; }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .tabs, .view-toggle {
+      display: flex;
+      gap: 3px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      flex-shrink: 0;
+    }
+    .tab, .vtab {
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .18s;
+      white-space: nowrap;
+      padding: 5px 13px;
+    }
+    .tab.active  { background: var(--accent); color: #fff; }
+    .vtab.active { background: var(--blue);   color: #fff; }
+    .tab:hover:not(.active),
+    .vtab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+    .filter-group { display: flex; align-items: center; gap: 6px; }
+    label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    select, input[type=text] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .18s;
+    }
+    select:focus, input[type=text]:focus { border-color: var(--blue); }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+    }
+    .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; line-height: 1.1; }
+
+    /* ── Main layout: side-by-side on wide, stacked on mobile ── */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    /* ── Number list panel ── */
+    .num-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .num-panel-head {
+      padding: 9px 13px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .num-panel-head h3 { font-size: 11px; font-weight: 600; color: var(--text); }
+    .num-panel-toggle {
+      display: none; /* shown on mobile */
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .panel-search-wrap { padding: 6px 6px 0; }
+    .panel-search {
+      width: 100%;
+      padding: 5px 9px;
+      font-size: 11px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+    }
+    .panel-search:focus { border-color: var(--blue); }
+    .num-panel-body {
+      overflow-y: auto;
+      max-height: calc(100vh - 320px);
+      min-height: 120px;
+      padding: 6px;
+      transition: max-height .25s ease;
+    }
+    .num-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 3px;
+    }
+    .nb {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 2px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: var(--surface2);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .13s;
+      min-width: 0;
+    }
+    .nb:hover  { border-color: var(--nb-hover-border); background: var(--nb-hover-bg); }
+    .nb.active { border-color: var(--accent); background: var(--nb-active-bg); }
+    .nb-n { font-size: 10px; font-weight: 600; color: var(--text); line-height: 1; }
+    .nb-c { font-size: 9px;  color: var(--muted); margin-top: 2px; line-height: 1; }
+    .nb.hot  .nb-n { color: var(--green); }
+    .nb.warm .nb-n { color: var(--accent); }
+
+    /* ── Heatmap ── */
+    .heatmap-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      min-width: 0;
+    }
+    .heatmap-scroll { overflow: auto; max-height: calc(100vh - 310px); }
+    table { border-collapse: separate; border-spacing: 0; font-size: 11px; min-width: max-content; }
+    table thead { position: sticky; top: 0; z-index: 10; }
+    table thead th {
+      background: var(--surface2);
+      padding: 6px 8px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    table thead th:first-child {
+      min-width: 52px;
+      position: sticky;
+      left: 0;
+      z-index: 20;
+      border-right: 1px solid var(--border);
+    }
+    table tbody tr th {
+      position: sticky;
+      left: 0;
+      z-index: 5;
+      background: var(--surface);
+      padding: 2px 8px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 500;
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+      min-width: 52px;
+      cursor: pointer;
+      transition: background .13s, color .13s;
+    }
+    table tbody tr th:hover              { color: var(--blue); background: var(--row-hover-bg); }
+    table tbody tr.hl th                 { color: var(--accent); background: var(--row-hl-bg) !important; }
+    table tbody td {
+      width: 26px; height: 18px;
+      cursor: pointer;
+      transition: transform .1s, outline .1s;
+      position: relative;
+    }
+    table tbody td:hover { outline: 2px solid rgba(128,128,128,.3); outline-offset: -1px; transform: scale(1.25); z-index: 2; }
+    table tbody td.z { background: var(--surface); }
+    table tbody tr.hl td { filter: brightness(1.35); }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .l-scale { display: flex; gap: 3px; }
+    .l-sw { width: 15px; height: 11px; border-radius: 2px; }
+
+    /* ── Tooltip ── */
+    #tip {
+      position: fixed;
+      pointer-events: none;
+      background: var(--tip-bg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 9px 13px;
+      font-size: 12px;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,.5);
+      max-width: 200px;
+    }
+    #tip strong { color: var(--text); display: block; font-size: 13px; margin-bottom: 3px; }
+    .tr { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); margin-top: 2px; }
+    .tr span:last-child { color: var(--text); font-weight: 600; }
+
+    /* ── Modal ── */
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.65);
+      z-index: 500;
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    #overlay.open { display: flex; }
+    #modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      width: min(620px, 100%);
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,.75);
+      animation: up .2s ease;
+    }
+    @keyframes up { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+    .m-head {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .m-title { display: flex; align-items: center; gap: 12px; }
+    .m-num { font-size: 28px; font-weight: 800; color: var(--green); letter-spacing: -1px; }
+    .m-meta { font-size: 12px; color: var(--muted); line-height: 1.7; }
+    .m-meta strong { color: var(--text); }
+    .m-close {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 32px; height: 32px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s;
+      flex-shrink: 0;
+    }
+    .m-close:hover { background: var(--close-hover-bg); border-color: var(--accent); color: var(--accent); }
+    .m-body { overflow-y: auto; padding: 16px 20px; flex: 1; }
+    .yr-group { margin-bottom: 18px; }
+    .yr-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      margin-bottom: 8px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--text);
+      cursor: default;
+      transition: all .13s;
+    }
+    .chip:hover { border-color: var(--green); color: var(--green); }
+    .m-empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 13px; }
+
+    /* ── Responsive breakpoints ── */
+
+    /* Tablet: collapse number panel to compact grid */
+    @media (max-width: 900px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+      .num-panel {
+        order: 2;
+      }
+      .heatmap-wrap {
+        order: 1;
+      }
+      .num-panel-toggle { display: flex; }
+      .num-panel-body.collapsed {
+        max-height: 0 !important;
+        overflow: hidden;
+        padding: 0 6px;
+      }
+      .num-panel-body { max-height: 220px; }
+      .heatmap-scroll { max-height: 55vh; }
+    }
+
+    /* Mobile: tighter padding and font sizes */
+    @media (max-width: 600px) {
+      body { padding: 0 10px 24px; }
+      .stat-value { font-size: 18px; }
+      .tab, .vtab { padding: 5px 9px; font-size: 11px; }
+      .controls { gap: 6px; }
+      header h1 { font-size: 18px; }
+    }
+
+    /* ── Theme toggle ── */
+    .theme-toggle {
+      display: flex;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      flex-shrink: 0;
+    }
+    .theme-btn {
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .18s;
+      white-space: nowrap;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .theme-btn.active { background: var(--surface2); color: var(--text); }
+    .theme-btn:hover:not(.active) { background: var(--surface2); color: var(--text); opacity: .8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h1>🎰 Thai Lottery Heatmap</h1>
+        <span class="gen-badge">⚡ Static &nbsp;·&nbsp; <b>383 draws · 20 Mar 2026</b></span>
+      </div>
+      <div class="theme-toggle" role="group" aria-label="Color theme">
+        <button class="theme-btn" id="theme-dark"   onclick="setTheme('dark')">🌙 Dark</button>
+        <button class="theme-btn" id="theme-light"  onclick="setTheme('light')">☀️ Light</button>
+        <button class="theme-btn" id="theme-system" onclick="setTheme('system')">🖥 System</button>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="tabs" role="tablist">
+        <button class="tab active" onclick="switchType('last3f')" id="tab-last3f">3 ตัวหน้า</button>
+        <button class="tab" onclick="switchType('last3b')" id="tab-last3b">3 ตัวหลัง</button>
+        <button class="tab" onclick="switchType('last2')"  id="tab-last2">2 ตัวท้าย</button>
+      </div>
+      <div class="view-toggle">
+        <button class="vtab active" id="vtab-month" onclick="switchView('month')">By Month</button>
+        <button class="vtab"        id="vtab-year"  onclick="switchView('year')">By Year</button>
+      </div>
+      <div class="filter-group">
+        <label>Year</label>
+        <select id="year-filter" onchange="render()"><option value="all">All Years</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Search</label>
+        <input type="text" id="number-search" placeholder="e.g. 123" oninput="renderList();render()" maxlength="3" style="width:100px"/>
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-card"><div class="stat-label">Total Draws</div><div class="stat-value" id="s-draws" style="color:var(--blue)">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Numbers</div><div class="stat-value" id="s-nums" style="color:var(--purple)">—</div></div>
+      <div class="stat-card"><div class="stat-label">Hottest Number</div><div class="stat-value" id="s-hot" style="color:var(--accent)">—</div></div>
+      <div class="stat-card"><div class="stat-label">Max Appearances</div><div class="stat-value" id="s-max" style="color:var(--green)">—</div></div>
+    </div>
+
+    <div class="main-layout">
+
+      <!-- Number list panel -->
+      <div class="num-panel" id="num-panel">
+        <div class="num-panel-head">
+          <h3 id="list-title">Numbers (000–999)</h3>
+          <button class="num-panel-toggle" id="panel-toggle" onclick="togglePanel()" title="Toggle list">▾</button>
+        </div>
+        <div class="panel-search-wrap">
+          <input class="panel-search" id="list-search" type="text" placeholder="Filter numbers…" maxlength="3" oninput="renderList()"/>
+        </div>
+        <div class="num-panel-body" id="num-body">
+          <div class="num-grid" id="num-grid"></div>
+        </div>
+      </div>
+
+      <!-- Heatmap -->
+      <div class="heatmap-wrap">
+        <div class="heatmap-scroll" id="heatmap-scroll">
+          <div id="heatmap"></div>
+        </div>
+        <div class="legend">
+          <span>Less</span>
+          <div class="l-scale" id="legend"></div>
+          <span>More</span>
+          <span style="margin-left:8px;font-size:10px">Click row or number for dates</span>
+        </div>
+      </div>
+
+    </div><!-- /main-layout -->
+  </div><!-- /container -->
+
+  <div id="tip"></div>
+
+  <div id="overlay" onclick="if(event.target===this)closeModal()">
+    <div id="modal">
+      <div class="m-head">
+        <div class="m-title">
+          <div class="m-num" id="m-num">—</div>
+          <div class="m-meta" id="m-meta"></div>
+        </div>
+        <button class="m-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="m-body" id="m-body"></div>
+    </div>
+  </div>
+
+  <script>
+    const D  = {"last3f":{"103":{"dates":["2021-08-01"]},"104":{"dates":["2024-05-02"]},"106":{"dates":["2015-11-01","2018-02-01"]},"109":{"dates":["2025-05-16"]},"111":{"dates":["2016-06-01","2023-04-01"]},"115":{"dates":["2017-08-16"]},"116":{"dates":["2019-12-30","2025-05-02"]},"121":{"dates":["2017-06-01"]},"122":{"dates":["2024-04-01"]},"127":{"dates":["2020-09-16"]},"128":{"dates":["2017-02-16"]},"130":{"dates":["2018-05-16"]},"131":{"dates":["2018-04-01","2025-09-01"]},"132":{"dates":["2020-01-17"]},"134":{"dates":["2015-10-16","2025-06-01"]},"135":{"dates":["2019-08-01"]},"137":{"dates":["2019-03-01"]},"138":{"dates":["2019-12-16"]},"139":{"dates":["2025-03-01"]},"140":{"dates":["2015-12-17"]},"142":{"dates":["2025-08-01"]},"143":{"dates":["2021-04-16"]},"148":{"dates":["2019-03-16"]},"149":{"dates":["2019-08-16"]},"154":{"dates":["2020-11-01"]},"158":{"dates":["2022-10-16"]},"159":{"dates":["2022-07-16"]},"164":{"dates":["2019-11-16"]},"165":{"dates":["2017-11-01"]},"167":{"dates":["2023-10-16"]},"169":{"dates":["2016-07-01","2025-07-01"]},"170":{"dates":["2022-12-01"]},"171":{"dates":["2025-07-16"]},"172":{"dates":["2017-09-16"]},"173":{"dates":["2024-09-01"]},"174":{"dates":["2021-07-16","2024-11-01"]},"175":{"dates":["2015-10-01"]},"176":{"dates":["2025-12-16"]},"180":{"dates":["2017-10-16"]},"181":{"dates":["2015-12-01","2023-02-01"]},"186":{"dates":["2018-10-16"]},"189":{"dates":["2020-10-16"]},"193":{"dates":["2021-06-01"]},"194":{"dates":["2016-10-01","2024-06-01"]},"195":{"dates":["2023-02-16","2026-02-01"]},"206":{"dates":["2019-01-17","2022-10-01"]},"209":{"dates":["2015-09-16"]},"210":{"dates":["2019-09-01"]},"212":{"dates":["2024-08-16"]},"218":{"dates":["2017-06-01"]},"220":{"dates":["2020-09-16","2024-09-01"]},"225":{"dates":["2024-11-01"]},"226":{"dates":["2017-07-01"]},"228":{"dates":["2016-04-16"]},"230":{"dates":["2024-09-16"]},"231":{"dates":["2025-05-16"]},"236":{"dates":["2022-03-01"]},"238":{"dates":["2015-12-01","2016-05-02"]},"239":{"dates":["2019-07-01"]},"241":{"dates":["2015-11-16","2026-02-16"]},"242":{"dates":["2022-07-01","2025-11-16"]},"243":{"dates":["2025-06-16"]},"246":{"dates":["2015-12-30"]},"247":{"dates":["2021-11-01","2022-05-16","2025-08-16"]},"248":{"dates":["2021-02-01"]},"250":{"dates":["2015-12-17"]},"251":{"dates":["2016-06-16"]},"254":{"dates":["2025-04-16"]},"255":{"dates":["2019-10-16"]},"258":{"dates":["2020-03-16"]},"259":{"dates":["2020-02-01"]},"260":{"dates":["2015-09-01"]},"261":{"dates":["2019-12-01","2023-07-16"]},"264":{"dates":["2015-12-30","2020-06-01"]},"265":{"dates":["2023-12-01"]},"266":{"dates":["2022-08-01"]},"268":{"dates":["2023-07-31","2025-02-16"]},"271":{"dates":["2022-08-16"]},"273":{"dates":["2018-04-16"]},"278":{"dates":["2021-09-01"]},"280":{"dates":["2016-10-01"]},"281":{"dates":["2023-07-01"]},"283":{"dates":["2021-04-01"]},"285":{"dates":["2020-04-01","2021-10-01","2022-06-16","2025-02-01"]},"287":{"dates":["2022-07-01"]},"289":{"dates":["2022-04-16"]},"290":{"dates":["2021-03-01","2024-12-16"]},"294":{"dates":["2020-03-01"]},"298":{"dates":["2022-09-01"]},"299":{"dates":["2026-01-17"]},"300":{"dates":["2022-08-16"]},"302":{"dates":["2017-08-16","2021-09-01"]},"303":{"dates":["2017-12-01"]},"304":{"dates":["2016-12-30"]},"306":{"dates":["2021-05-02"]},"307":{"dates":["2018-12-01","2021-08-01"]},"310":{"dates":["2018-06-01"]},"312":{"dates":["2016-02-16"]},"318":{"dates":["2018-03-02","2021-02-16"]},"323":{"dates":["2018-09-16","2019-11-01"]},"324":{"dates":["2017-03-16","2023-10-01"]},"328":{"dates":["2020-03-01","2025-11-01"]},"330":{"dates":["2024-02-16"]},"331":{"dates":["2024-07-16"]},"334":{"dates":["2016-09-01","2024-08-16"]},"335":{"dates":["2016-09-01","2023-11-01"]},"336":{"dates":["2020-12-30"]},"340":{"dates":["2018-08-16"]},"345":{"dates":["2017-09-01"]},"346":{"dates":["2023-11-16"]},"347":{"dates":["2026-01-02"]},"349":{"dates":["2022-03-16","2025-06-01"]},"355":{"dates":["2019-07-15","2023-10-01"]},"357":{"dates":["2018-05-16"]},"361":{"dates":["2021-10-01"]},"362":{"dates":["2020-07-01"]},"364":{"dates":["2024-06-01"]},"366":{"dates":["2016-08-16","2016-12-16"]},"367":{"dates":["2021-01-17"]},"368":{"dates":["2020-11-16"]},"373":{"dates":["2017-12-30"]},"377":{"dates":["2020-12-16"]},"382":{"dates":["2016-05-16","2019-12-30"]},"384":{"dates":["2018-11-01","2023-07-16"]},"386":{"dates":["2017-08-01"]},"388":{"dates":["2018-02-16"]},"389":{"dates":["2023-01-17","2025-12-01"]},"390":{"dates":["2016-04-01"]},"391":{"dates":["2022-04-01"]},"392":{"dates":["2018-10-16","2019-10-01"]},"396":{"dates":["2017-05-16"]},"398":{"dates":["2023-10-16"]},"403":{"dates":["2015-09-01","2016-05-02","2018-07-16"]},"408":{"dates":["2024-08-01"]},"410":{"dates":["2023-12-16"]},"411":{"dates":["2022-12-16"]},"412":{"dates":["2019-01-17","2023-11-16"]},"413":{"dates":["2025-04-16"]},"418":{"dates":["2025-02-01"]},"420":{"dates":["2023-03-16"]},"421":{"dates":["2021-08-16"]},"425":{"dates":["2017-11-01"]},"426":{"dates":["2016-03-01"]},"428":{"dates":["2024-06-16"]},"429":{"dates":["2018-07-01","2024-01-17"]},"430":{"dates":["2020-04-01"]},"431":{"dates":["2023-08-16","2025-12-16"]},"432":{"dates":["2018-06-16"]},"435":{"dates":["2015-09-16"]},"443":{"dates":["2023-01-17"]},"446":{"dates":["2025-01-02"]},"449":{"dates":["2025-11-01"]},"450":{"dates":["2017-03-01"]},"454":{"dates":["2024-02-01"]},"457":{"dates":["2015-10-16"]},"458":{"dates":["2021-11-01"]},"464":{"dates":["2017-02-16","2018-09-01","2020-10-16"]},"471":{"dates":["2018-11-16","2021-11-16"]},"476":{"dates":["2019-05-02"]},"479":{"dates":["2026-03-01"]},"480":{"dates":["2018-12-16"]},"489":{"dates":["2017-07-01","2020-06-01"]},"493":{"dates":["2016-09-16"]},"495":{"dates":["2017-12-30"]},"500":{"dates":["2023-05-02"]},"507":{"dates":["2018-06-16"]},"509":{"dates":["2024-03-16"]},"510":{"dates":["2020-07-16","2026-03-16"]},"511":{"dates":["2017-01-17"]},"512":{"dates":["2018-09-01","2019-04-16","2025-09-16"]},"513":{"dates":["2016-12-01"]},"515":{"dates":["2020-02-16"]},"518":{"dates":["2022-05-02"]},"519":{"dates":["2023-06-16"]},"521":{"dates":["2023-09-01"]},"522":{"dates":["2022-12-30"]},"525":{"dates":["2025-08-01"]},"527":{"dates":["2018-05-02","2026-02-16"]},"530":{"dates":["2016-03-01","2018-07-16","2025-03-01"]},"531":{"dates":["2025-10-16"]},"532":{"dates":["2016-01-17","2022-11-16","2025-10-01"]},"533":{"dates":["2020-07-16"]},"538":{"dates":["2016-08-01"]},"539":{"dates":["2018-09-16"]},"540":{"dates":["2022-09-16"]},"546":{"dates":["2016-04-01"]},"549":{"dates":["2022-06-16"]},"552":{"dates":["2016-07-16","2020-02-01"]},"553":{"dates":["2018-06-01"]},"559":{"dates":["2024-12-01"]},"560":{"dates":["2017-03-01"]},"561":{"dates":["2024-10-16"]},"571":{"dates":["2024-03-16"]},"573":{"dates":["2017-05-02"]},"575":{"dates":["2020-08-01"]},"576":{"dates":["2018-11-01"]},"577":{"dates":["2023-03-01"]},"579":{"dates":["2024-08-01"]},"583":{"dates":["2016-09-16"]},"584":{"dates":["2017-07-16"]},"589":{"dates":["2019-06-01"]},"591":{"dates":["2021-12-30"]},"594":{"dates":["2018-10-01","2020-10-01"]},"595":{"dates":["2025-03-16"]},"596":{"dates":["2016-12-16","2023-09-01"]},"598":{"dates":["2020-11-01"]},"600":{"dates":["2023-12-30"]},"602":{"dates":["2021-10-16","2025-08-16","2025-11-16"]},"605":{"dates":["2021-02-01"]},"609":{"dates":["2016-07-01","2021-09-16"]},"611":{"dates":["2017-10-01"]},"613":{"dates":["2025-02-16"]},"614":{"dates":["2020-08-16"]},"615":{"dates":["2021-05-16"]},"616":{"dates":["2017-12-16"]},"617":{"dates":["2019-12-01"]},"620":{"dates":["2021-06-01"]},"624":{"dates":["2018-01-17"]},"625":{"dates":["2016-02-01","2019-06-16","2019-10-16"]},"626":{"dates":["2017-06-16","2017-12-01","2024-12-01"]},"628":{"dates":["2023-06-16"]},"629":{"dates":["2021-12-16"]},"635":{"dates":["2025-04-01"]},"636":{"dates":["2020-09-01"]},"640":{"dates":["2019-11-16"]},"643":{"dates":["2019-02-01"]},"644":{"dates":["2022-02-17"]},"647":{"dates":["2017-09-16"]},"648":{"dates":["2021-11-16","2023-12-30","2024-10-16"]},"653":{"dates":["2021-01-17"]},"654":{"dates":["2018-04-16"]},"655":{"dates":["2025-12-01"]},"663":{"dates":["2017-01-17"]},"664":{"dates":["2023-02-16"]},"666":{"dates":["2021-08-16"]},"669":{"dates":["2019-05-16"]},"670":{"dates":["2018-08-16","2023-04-16"]},"678":{"dates":["2023-04-16","2023-05-16"]},"679":{"dates":["2017-09-01","2022-06-01"]},"680":{"dates":["2025-07-01"]},"681":{"dates":["2023-06-01"]},"682":{"dates":["2016-11-16"]},"692":{"dates":["2016-10-16"]},"694":{"dates":["2026-01-02"]},"699":{"dates":["2016-02-16","2023-09-16","2025-01-17"]},"708":{"dates":["2023-07-31"]},"712":{"dates":["2020-08-16"]},"713":{"dates":["2019-06-01"]},"720":{"dates":["2018-03-16"]},"722":{"dates":["2022-11-01","2022-11-16"]},"725":{"dates":["2020-09-01","2022-09-01"]},"726":{"dates":["2017-10-01","2018-10-01","2020-03-16"]},"727":{"dates":["2024-04-16"]},"729":{"dates":["2024-04-16"]},"731":{"dates":["2022-01-17"]},"733":{"dates":["2019-09-16"]},"734":{"dates":["2016-07-16"]},"736":{"dates":["2022-05-16"]},"738":{"dates":["2022-04-01"]},"739":{"dates":["2021-12-01","2023-05-16","2023-08-16"]},"740":{"dates":["2021-12-01","2025-09-16"]},"741":{"dates":["2020-11-16"]},"742":{"dates":["2024-12-16"]},"747":{"dates":["2024-05-16"]},"755":{"dates":["2021-04-01"]},"757":{"dates":["2015-11-01","2020-10-01"]},"760":{"dates":["2025-04-01"]},"763":{"dates":["2024-05-02"]},"766":{"dates":["2017-04-16"]},"775":{"dates":["2016-06-01"]},"776":{"dates":["2020-12-01"]},"778":{"dates":["2022-05-02"]},"779":{"dates":["2019-02-01"]},"780":{"dates":["2023-05-02"]},"786":{"dates":["2022-01-17","2022-12-01"]},"787":{"dates":["2018-04-01"]},"789":{"dates":["2023-02-01"]},"794":{"dates":["2021-07-01"]},"799":{"dates":["2018-01-17"]},"800":{"dates":["2023-03-16"]},"804":{"dates":["2016-06-16","2020-12-30"]},"806":{"dates":["2019-11-01"]},"807":{"dates":["2017-02-01"]},"809":{"dates":["2024-04-01"]},"812":{"dates":["2024-10-01"]},"815":{"dates":["2026-01-17"]},"817":{"dates":["2021-09-16","2022-06-01"]},"824":{"dates":["2016-11-01"]},"826":{"dates":["2025-05-02"]},"828":{"dates":["2020-12-16"]},"831":{"dates":["2017-11-16"]},"832":{"dates":["2018-08-01"]},"834":{"dates":["2022-03-01","2022-07-16"]},"835":{"dates":["2017-07-16"]},"836":{"dates":["2017-12-16"]},"838":{"dates":["2021-03-01"]},"839":{"dates":["2022-11-01","2024-07-01"]},"843":{"dates":["2021-05-16","2025-10-01"]},"847":{"dates":["2019-09-01"]},"855":{"dates":["2016-03-16"]},"859":{"dates":["2022-04-16"]},"861":{"dates":["2021-02-16"]},"864":{"dates":["2019-07-01"]},"867":{"dates":["2023-07-01"]},"870":{"dates":["2018-03-02"]},"873":{"dates":["2016-12-01"]},"876":{"dates":["2020-06-16"]},"877":{"dates":["2016-03-16"]},"878":{"dates":["2017-06-16"]},"881":{"dates":["2019-02-16"]},"882":{"dates":["2020-06-16"]},"883":{"dates":["2019-03-16"]},"884":{"dates":["2019-06-16"]},"885":{"dates":["2016-10-16","2024-05-16"]},"888":{"dates":["2019-04-01"]},"890":{"dates":["2016-12-30"]},"893":{"dates":["2022-08-01"]},"900":{"dates":["2024-03-01"]},"901":{"dates":["2018-07-01","2019-07-15"]},"902":{"dates":["2021-03-16"]},"903":{"dates":["2018-08-01"]},"904":{"dates":["2024-09-16"]},"910":{"dates":["2019-02-16"]},"912":{"dates":["2019-08-16","2022-12-16"]},"913":{"dates":["2018-12-30","2023-11-01"]},"914":{"dates":["2023-04-01"]},"917":{"dates":["2026-02-01"]},"918":{"dates":["2015-10-01","2017-03-16"]},"919":{"dates":["2023-03-01"]},"920":{"dates":["2019-10-01"]},"923":{"dates":["2024-11-16"]},"927":{"dates":["2025-03-16"]},"930":{"dates":["2018-11-16","2019-04-16"]},"931":{"dates":["2020-08-01","2024-01-17"]},"942":{"dates":["2022-02-01"]},"943":{"dates":["2024-02-01"]},"947":{"dates":["2018-02-01","2019-09-16"]},"948":{"dates":["2018-12-16"]},"949":{"dates":["2017-05-02","2019-05-16"]},"952":{"dates":["2020-02-16"]},"955":{"dates":["2025-10-16"]},"959":{"dates":["2019-04-01"]},"961":{"dates":["2017-11-16","2025-01-17"]},"964":{"dates":["2021-10-16"]},"966":{"dates":["2016-08-16"]},"971":{"dates":["2017-10-16","2022-09-16"]},"973":{"dates":["2017-04-16"]},"975":{"dates":["2016-05-16","2024-03-01","2024-07-01"]},"976":{"dates":["2016-11-01"]},"979":{"dates":["2021-12-30"]},"980":{"dates":["2018-05-02"]},"983":{"dates":["2016-08-01","2019-08-01","2026-03-16"]},"985":{"dates":["2022-03-16"]},"995":{"dates":["2025-07-16"]},"996":{"dates":["2022-10-01"]},"999":{"dates":["2016-02-01","2019-03-01"]},"028":{"dates":["2015-11-16"]},"031":{"dates":["2016-01-17","2018-12-30"]},"008":{"dates":["2016-04-16","2017-05-16"]},"040":{"dates":["2016-11-16"]},"066":{"dates":["2017-02-01"]},"057":{"dates":["2017-04-01"]},"020":{"dates":["2017-04-01"]},"061":{"dates":["2017-08-01","2022-02-01"]},"007":{"dates":["2018-02-16","2021-06-16","2022-12-30"]},"064":{"dates":["2018-03-16"]},"045":{"dates":["2018-12-01"]},"043":{"dates":["2019-05-02","2019-12-16"]},"004":{"dates":["2020-01-17"]},"095":{"dates":["2020-07-01"]},"093":{"dates":["2020-12-01"]},"036":{"dates":["2021-03-16","2024-11-16"]},"013":{"dates":["2021-04-16"]},"018":{"dates":["2021-05-02"]},"054":{"dates":["2021-06-16","2026-03-01"]},"073":{"dates":["2021-07-01"]},"058":{"dates":["2021-07-16","2023-12-16"]},"097":{"dates":["2021-12-16"]},"085":{"dates":["2022-02-17"]},"037":{"dates":["2022-10-16","2023-09-16"]},"000":{"dates":["2023-06-01"]},"055":{"dates":["2023-12-01"]},"056":{"dates":["2024-02-16"]},"016":{"dates":["2024-06-16"]},"011":{"dates":["2024-07-16"]},"053":{"dates":["2024-10-01"]},"065":{"dates":["2025-01-02"]},"017":{"dates":["2025-06-16"]},"012":{"dates":["2025-09-01"]}},"last3b":{"101":{"dates":["2012-05-16","2015-04-16","2023-02-01"]},"103":{"dates":["2010-09-16","2015-02-16"]},"104":{"dates":["2011-10-01","2014-07-16"]},"106":{"dates":["2022-06-16"]},"109":{"dates":["2013-02-16"]},"110":{"dates":["2020-10-01"]},"111":{"dates":["2012-02-16","2013-12-16","2025-11-01"]},"112":{"dates":["2014-05-16","2014-09-16"]},"113":{"dates":["2019-07-15"]},"114":{"dates":["2013-06-16"]},"116":{"dates":["2014-03-01"]},"117":{"dates":["2014-07-16"]},"119":{"dates":["2022-01-17"]},"121":{"dates":["2011-02-01"]},"123":{"dates":["2012-09-16","2014-07-01","2021-09-01"]},"126":{"dates":["2012-12-30"]},"127":{"dates":["2019-01-17","2019-06-16"]},"128":{"dates":["2017-10-16"]},"129":{"dates":["2010-11-16","2021-05-02"]},"132":{"dates":["2018-06-16","2019-10-16"]},"133":{"dates":["2011-05-02","2013-03-01"]},"135":{"dates":["2012-03-01"]},"137":{"dates":["2024-05-16","2025-12-01"]},"138":{"dates":["2018-07-16"]},"140":{"dates":["2014-06-16","2018-11-16","2019-12-30"]},"143":{"dates":["2014-05-02"]},"148":{"dates":["2012-09-01","2016-12-01"]},"149":{"dates":["2014-01-16"]},"150":{"dates":["2012-01-16","2014-05-16"]},"151":{"dates":["2010-05-16"]},"152":{"dates":["2012-10-16"]},"153":{"dates":["2010-12-30"]},"154":{"dates":["2010-04-16","2019-03-16","2024-04-16"]},"155":{"dates":["2016-03-01","2018-09-16"]},"157":{"dates":["2022-11-16"]},"158":{"dates":["2014-05-02","2014-06-16","2016-07-16"]},"159":{"dates":["2012-07-16","2014-10-01"]},"160":{"dates":["2011-07-01","2014-06-01","2016-09-16","2021-08-16"]},"161":{"dates":["2014-12-01"]},"162":{"dates":["2011-06-16"]},"163":{"dates":["2015-05-02"]},"164":{"dates":["2015-04-16"]},"166":{"dates":["2015-11-01"]},"167":{"dates":["2011-06-16","2025-05-02"]},"168":{"dates":["2011-12-30"]},"169":{"dates":["2026-02-16"]},"170":{"dates":["2013-04-01"]},"173":{"dates":["2013-11-01","2016-07-01"]},"174":{"dates":["2010-04-01"]},"175":{"dates":["2013-03-16","2015-12-01"]},"179":{"dates":["2014-11-16"]},"180":{"dates":["2025-04-01"]},"181":{"dates":["2018-02-01"]},"182":{"dates":["2010-08-01"]},"185":{"dates":["2011-01-16"]},"186":{"dates":["2010-12-30","2014-04-01"]},"187":{"dates":["2014-08-16","2023-05-02"]},"188":{"dates":["2012-11-01"]},"189":{"dates":["2011-10-01"]},"191":{"dates":["2010-08-01","2020-04-01"]},"192":{"dates":["2018-10-16"]},"194":{"dates":["2019-11-16","2022-10-01"]},"195":{"dates":["2015-05-02","2017-09-01"]},"196":{"dates":["2013-01-16","2024-01-17"]},"197":{"dates":["2019-02-01"]},"199":{"dates":["2012-03-01","2016-12-16"]},"200":{"dates":["2010-06-16","2024-04-16"]},"201":{"dates":["2013-08-16"]},"202":{"dates":["2018-09-01","2023-06-16"]},"203":{"dates":["2014-11-01"]},"205":{"dates":["2014-07-16","2018-03-16"]},"206":{"dates":["2019-11-01"]},"208":{"dates":["2020-11-16"]},"209":{"dates":["2011-03-16","2025-09-01"]},"210":{"dates":["2013-07-16","2018-07-01","2022-09-01"]},"212":{"dates":["2018-10-16"]},"213":{"dates":["2011-04-16","2022-06-01"]},"214":{"dates":["2012-02-16"]},"215":{"dates":["2019-06-01"]},"216":{"dates":["2012-04-16"]},"217":{"dates":["2012-11-01","2018-07-01"]},"219":{"dates":["2010-07-16"]},"221":{"dates":["2011-08-01","2011-11-01"]},"224":{"dates":["2012-07-16"]},"225":{"dates":["2018-05-02"]},"227":{"dates":["2011-01-16","2011-07-16","2015-08-16"]},"228":{"dates":["2013-12-16","2022-06-16"]},"229":{"dates":["2010-03-16"]},"230":{"dates":["2018-02-16"]},"231":{"dates":["2024-11-01"]},"233":{"dates":["2021-07-16"]},"234":{"dates":["2022-03-01"]},"235":{"dates":["2011-12-16","2013-09-16"]},"236":{"dates":["2018-01-17","2022-05-16"]},"238":{"dates":["2012-06-16"]},"239":{"dates":["2025-11-16"]},"241":{"dates":["2017-04-16"]},"242":{"dates":["2012-09-16","2014-01-16"]},"245":{"dates":["2020-11-01","2021-11-16"]},"246":{"dates":["2010-10-01","2014-05-16"]},"248":{"dates":["2018-06-01"]},"250":{"dates":["2014-03-16","2019-12-30","2022-12-30"]},"251":{"dates":["2014-10-01"]},"253":{"dates":["2011-12-01","2015-06-16","2017-08-16"]},"255":{"dates":["2020-11-16"]},"256":{"dates":["2013-11-01","2021-03-16"]},"257":{"dates":["2014-09-16","2017-12-01"]},"261":{"dates":["2013-05-16","2025-07-01"]},"263":{"dates":["2011-04-16"]},"264":{"dates":["2021-04-16"]},"268":{"dates":["2016-05-16"]},"269":{"dates":["2023-05-02"]},"271":{"dates":["2014-07-01"]},"272":{"dates":["2013-05-02","2023-10-16"]},"274":{"dates":["2019-09-01"]},"275":{"dates":["2013-12-30"]},"276":{"dates":["2021-05-16"]},"278":{"dates":["2017-09-01","2022-10-01"]},"279":{"dates":["2022-07-16"]},"280":{"dates":["2023-12-01","2025-10-01"]},"281":{"dates":["2013-09-01"]},"282":{"dates":["2021-02-01","2022-08-01"]},"284":{"dates":["2013-07-01","2022-08-16"]},"285":{"dates":["2010-04-16","2012-11-01","2016-04-01"]},"286":{"dates":["2015-02-01"]},"287":{"dates":["2017-10-16"]},"288":{"dates":["2026-01-02"]},"290":{"dates":["2017-12-16","2023-04-01"]},"291":{"dates":["2012-10-01","2023-09-01"]},"293":{"dates":["2010-05-16"]},"294":{"dates":["2015-07-16"]},"295":{"dates":["2011-12-16","2012-03-01","2021-10-16"]},"297":{"dates":["2018-09-16","2018-12-16","2025-01-02"]},"298":{"dates":["2010-06-01"]},"299":{"dates":["2025-06-16"]},"302":{"dates":["2016-07-01"]},"303":{"dates":["2012-12-01"]},"304":{"dates":["2013-11-16"]},"305":{"dates":["2014-03-16"]},"306":{"dates":["2010-12-16"]},"307":{"dates":["2020-07-01","2025-06-01"]},"308":{"dates":["2014-09-01","2025-09-16"]},"309":{"dates":["2010-07-16","2012-05-16","2016-02-16","2025-03-16"]},"310":{"dates":["2010-10-16"]},"314":{"dates":["2015-06-02"]},"315":{"dates":["2010-12-16"]},"316":{"dates":["2010-09-16"]},"321":{"dates":["2016-06-16","2020-12-30"]},"324":{"dates":["2013-10-01","2014-06-01"]},"325":{"dates":["2022-05-02"]},"328":{"dates":["2012-01-16"]},"329":{"dates":["2011-10-16","2013-08-01","2024-03-16"]},"331":{"dates":["2021-11-01"]},"332":{"dates":["2012-04-01"]},"333":{"dates":["2012-03-16","2015-08-01"]},"334":{"dates":["2013-01-16"]},"336":{"dates":["2025-07-16"]},"338":{"dates":["2012-11-01"]},"339":{"dates":["2015-03-16","2024-12-16"]},"340":{"dates":["2017-09-16"]},"342":{"dates":["2014-09-16","2020-09-01"]},"343":{"dates":["2022-11-01"]},"344":{"dates":["2014-04-16","2023-09-16"]},"345":{"dates":["2011-08-16"]},"346":{"dates":["2011-06-01"]},"349":{"dates":["2014-08-01","2023-11-01"]},"350":{"dates":["2012-03-16"]},"352":{"dates":["2013-07-16"]},"355":{"dates":["2014-04-16","2021-08-16","2023-03-16"]},"357":{"dates":["2011-03-01"]},"359":{"dates":["2013-05-02"]},"361":{"dates":["2011-02-01"]},"362":{"dates":["2018-07-16"]},"363":{"dates":["2026-01-17"]},"364":{"dates":["2020-04-01","2020-08-16"]},"366":{"dates":["2015-05-02"]},"369":{"dates":["2018-12-16"]},"373":{"dates":["2017-06-16"]},"374":{"dates":["2010-03-01","2010-06-01","2013-01-16","2019-05-02"]},"375":{"dates":["2015-09-16","2017-02-16","2019-07-01","2020-02-01","2024-02-16"]},"376":{"dates":["2025-01-02"]},"377":{"dates":["2023-02-16"]},"379":{"dates":["2020-01-17","2021-09-16","2021-10-01"]},"380":{"dates":["2011-11-01","2014-12-01"]},"382":{"dates":["2010-05-02","2024-03-01"]},"384":{"dates":["2011-02-16","2011-09-16"]},"385":{"dates":["2010-10-16"]},"386":{"dates":["2013-02-16","2015-06-16","2023-06-01"]},"387":{"dates":["2023-07-31"]},"388":{"dates":["2011-02-16","2017-09-16","2024-09-01"]},"389":{"dates":["2025-11-16"]},"390":{"dates":["2011-07-01","2013-05-16","2013-06-16","2017-07-16"]},"392":{"dates":["2015-02-16"]},"393":{"dates":["2021-04-01"]},"396":{"dates":["2011-03-01","2012-10-16","2021-03-16"]},"397":{"dates":["2011-04-16","2014-02-16","2018-01-17"]},"398":{"dates":["2015-01-16"]},"399":{"dates":["2012-06-01"]},"400":{"dates":["2014-03-16"]},"401":{"dates":["2021-12-01"]},"402":{"dates":["2013-10-16"]},"403":{"dates":["2019-04-01"]},"404":{"dates":["2020-03-16"]},"406":{"dates":["2011-11-16","2014-02-01"]},"408":{"dates":["2024-09-16","2026-02-01"]},"409":{"dates":["2014-06-01","2022-12-01"]},"412":{"dates":["2015-10-16"]},"413":{"dates":["2022-04-16"]},"414":{"dates":["2021-07-01"]},"417":{"dates":["2013-08-16"]},"419":{"dates":["2021-12-30"]},"420":{"dates":["2012-02-16"]},"421":{"dates":["2011-05-02","2022-12-01","2024-06-01","2024-07-16"]},"422":{"dates":["2014-11-16"]},"425":{"dates":["2011-11-16","2022-12-30"]},"426":{"dates":["2012-02-01","2012-05-02","2017-02-01","2023-10-01","2024-06-16"]},"429":{"dates":["2015-06-16"]},"430":{"dates":["2013-04-01"]},"431":{"dates":["2010-09-16"]},"432":{"dates":["2011-02-01","2022-09-16"]},"434":{"dates":["2012-12-01"]},"439":{"dates":["2019-09-01","2026-03-16"]},"440":{"dates":["2015-10-01"]},"441":{"dates":["2014-07-01"]},"447":{"dates":["2010-04-01","2021-06-16","2022-08-01","2024-06-16"]},"448":{"dates":["2010-08-16","2013-08-16","2025-01-17"]},"449":{"dates":["2021-10-01","2025-12-16"]},"450":{"dates":["2010-07-01","2016-12-01"]},"451":{"dates":["2013-08-01"]},"452":{"dates":["2013-02-01"]},"456":{"dates":["2023-12-30"]},"457":{"dates":["2010-03-01","2019-12-01","2025-03-16"]},"458":{"dates":["2016-10-01","2021-09-01"]},"461":{"dates":["2015-07-16"]},"462":{"dates":["2017-10-01"]},"463":{"dates":["2011-03-16","2011-07-01"]},"468":{"dates":["2012-05-02"]},"470":{"dates":["2010-03-01","2010-12-01"]},"472":{"dates":["2016-08-01"]},"473":{"dates":["2015-11-01"]},"474":{"dates":["2010-12-01","2025-04-16"]},"476":{"dates":["2021-12-16","2025-10-16"]},"477":{"dates":["2014-09-01","2016-12-30","2017-11-16","2025-01-17"]},"478":{"dates":["2021-04-16"]},"479":{"dates":["2012-06-16"]},"480":{"dates":["2013-06-01","2014-11-16"]},"484":{"dates":["2015-05-16"]},"485":{"dates":["2017-11-01","2021-12-01","2022-02-01"]},"486":{"dates":["2011-06-16"]},"489":{"dates":["2012-12-01","2018-03-16"]},"490":{"dates":["2014-09-01","2017-05-16"]},"491":{"dates":["2023-07-01"]},"492":{"dates":["2014-02-01"]},"493":{"dates":["2024-10-16"]},"494":{"dates":["2020-07-16"]},"495":{"dates":["2015-04-16"]},"498":{"dates":["2012-02-01","2015-03-01","2021-05-02"]},"499":{"dates":["2011-10-01","2014-04-01"]},"500":{"dates":["2017-04-01"]},"502":{"dates":["2013-06-16","2013-11-01"]},"503":{"dates":["2013-12-30"]},"504":{"dates":["2012-05-16","2017-12-30"]},"505":{"dates":["2014-05-16"]},"506":{"dates":["2018-05-16"]},"507":{"dates":["2011-10-16","2016-04-16"]},"508":{"dates":["2022-04-16"]},"509":{"dates":["2018-11-01","2022-02-01"]},"510":{"dates":["2011-02-16","2014-01-16"]},"511":{"dates":["2021-07-01"]},"512":{"dates":["2025-08-01"]},"513":{"dates":["2013-12-30"]},"516":{"dates":["2013-05-02","2017-01-17"]},"517":{"dates":["2010-05-02","2020-12-16"]},"518":{"dates":["2010-10-16"]},"519":{"dates":["2018-02-01"]},"520":{"dates":["2014-10-01"]},"521":{"dates":["2014-02-16"]},"522":{"dates":["2021-12-16"]},"523":{"dates":["2016-04-16","2023-02-16"]},"524":{"dates":["2011-05-02"]},"526":{"dates":["2013-07-16","2018-04-16"]},"529":{"dates":["2010-12-16","2013-03-16","2013-10-16","2022-01-17"]},"530":{"dates":["2012-07-01","2014-02-16"]},"532":{"dates":["2015-06-16"]},"533":{"dates":["2010-12-16","2011-09-01"]},"534":{"dates":["2011-07-16"]},"535":{"dates":["2011-02-16","2014-12-30","2016-02-16"]},"537":{"dates":["2014-03-01"]},"540":{"dates":["2022-05-16"]},"541":{"dates":["2011-12-30"]},"542":{"dates":["2022-07-01"]},"544":{"dates":["2011-03-01","2023-03-16","2024-02-01"]},"546":{"dates":["2011-01-16"]},"547":{"dates":["2012-06-16","2021-12-30","2024-11-16"]},"549":{"dates":["2018-08-01"]},"551":{"dates":["2011-11-16","2023-04-16"]},"553":{"dates":["2012-12-01"]},"554":{"dates":["2012-10-01"]},"555":{"dates":["2013-01-16","2019-12-16"]},"556":{"dates":["2011-06-01","2019-07-15"]},"557":{"dates":["2015-04-01"]},"558":{"dates":["2015-04-01","2016-11-16"]},"559":{"dates":["2024-04-01"]},"560":{"dates":["2012-11-16","2019-06-01"]},"561":{"dates":["2018-10-01","2018-12-01"]},"562":{"dates":["2019-08-01","2020-06-01"]},"563":{"dates":["2019-08-16"]},"564":{"dates":["2023-01-17"]},"565":{"dates":["2015-07-01","2020-06-16"]},"566":{"dates":["2021-01-17","2024-10-01"]},"567":{"dates":["2015-07-01"]},"570":{"dates":["2010-09-01","2013-09-01","2016-11-16"]},"572":{"dates":["2010-07-16"]},"573":{"dates":["2012-03-16"]},"574":{"dates":["2013-09-16"]},"576":{"dates":["2012-06-01","2012-11-16","2013-10-01","2014-06-16","2014-08-01"]},"577":{"dates":["2017-03-01","2021-04-01"]},"578":{"dates":["2010-08-16","2020-08-01","2022-04-01","2026-02-16"]},"580":{"dates":["2014-12-01","2019-08-16"]},"581":{"dates":["2012-04-01","2017-06-01"]},"582":{"dates":["2011-06-16","2020-06-01"]},"583":{"dates":["2011-08-01"]},"584":{"dates":["2011-04-01","2013-07-16","2023-12-16"]},"587":{"dates":["2016-10-16","2024-02-16"]},"589":{"dates":["2011-09-16","2012-05-02","2012-12-30","2018-03-02"]},"591":{"dates":["2018-08-16","2024-02-01"]},"592":{"dates":["2022-02-17"]},"593":{"dates":["2011-04-16","2022-12-16"]},"595":{"dates":["2015-01-16","2020-01-17","2020-10-01"]},"596":{"dates":["2011-02-01","2015-12-30","2016-08-16"]},"597":{"dates":["2011-12-30","2012-05-02","2020-03-01"]},"598":{"dates":["2012-02-01","2012-09-01","2015-08-01","2019-10-16"]},"599":{"dates":["2012-08-01"]},"601":{"dates":["2017-12-01","2023-07-31"]},"602":{"dates":["2018-05-02"]},"603":{"dates":["2017-05-16"]},"604":{"dates":["2022-09-01"]},"605":{"dates":["2025-10-01"]},"606":{"dates":["2012-03-16","2012-06-01","2019-10-01","2022-10-16"]},"607":{"dates":["2014-11-01"]},"609":{"dates":["2011-07-16"]},"611":{"dates":["2012-07-01"]},"612":{"dates":["2012-08-16","2019-02-16"]},"615":{"dates":["2023-10-01"]},"616":{"dates":["2012-04-01"]},"618":{"dates":["2010-05-02","2024-07-16"]},"619":{"dates":["2010-03-16"]},"622":{"dates":["2015-03-16","2024-08-01"]},"623":{"dates":["2014-08-01","2015-03-16","2020-09-16"]},"624":{"dates":["2015-08-16"]},"625":{"dates":["2020-06-16"]},"627":{"dates":["2010-03-01","2012-11-16"]},"628":{"dates":["2010-06-16","2017-02-01","2017-11-16"]},"630":{"dates":["2016-09-01"]},"631":{"dates":["2016-08-16","2022-09-16","2025-05-16"]},"633":{"dates":["2014-08-16"]},"634":{"dates":["2014-04-16","2024-05-02"]},"635":{"dates":["2024-01-17"]},"636":{"dates":["2014-06-01"]},"637":{"dates":["2014-08-01"]},"638":{"dates":["2015-12-17","2018-04-01"]},"639":{"dates":["2012-01-16","2012-09-01","2014-06-16","2014-08-16"]},"641":{"dates":["2013-02-01"]},"643":{"dates":["2015-11-16"]},"645":{"dates":["2011-09-16"]},"647":{"dates":["2014-10-16","2024-07-01"]},"648":{"dates":["2015-08-01","2015-08-16"]},"650":{"dates":["2013-10-01","2018-06-01"]},"651":{"dates":["2011-12-16","2021-02-01"]},"652":{"dates":["2022-06-01","2025-02-16"]},"653":{"dates":["2010-11-01"]},"654":{"dates":["2024-12-01"]},"656":{"dates":["2010-09-01","2011-06-01","2012-07-01","2025-03-01"]},"657":{"dates":["2013-02-16"]},"660":{"dates":["2011-08-01","2019-01-17"]},"661":{"dates":["2020-03-16"]},"662":{"dates":["2025-05-02","2026-01-17"]},"663":{"dates":["2010-04-01"]},"664":{"dates":["2010-12-01","2023-02-01"]},"665":{"dates":["2019-12-16"]},"666":{"dates":["2025-04-01"]},"668":{"dates":["2021-06-16"]},"669":{"dates":["2016-09-01"]},"670":{"dates":["2013-04-01"]},"671":{"dates":["2016-05-02"]},"672":{"dates":["2013-11-16"]},"673":{"dates":["2010-06-01","2014-05-02"]},"681":{"dates":["2010-06-16"]},"682":{"dates":["2020-07-16"]},"685":{"dates":["2025-02-01"]},"688":{"dates":["2017-07-01"]},"689":{"dates":["2010-08-16"]},"690":{"dates":["2025-11-01"]},"691":{"dates":["2022-03-01"]},"692":{"dates":["2023-09-01"]},"693":{"dates":["2023-05-16"]},"694":{"dates":["2017-03-16"]},"695":{"dates":["2013-02-01"]},"697":{"dates":["2024-08-16"]},"698":{"dates":["2023-04-01"]},"699":{"dates":["2019-05-02"]},"700":{"dates":["2011-05-16","2015-06-02"]},"701":{"dates":["2018-12-30"]},"703":{"dates":["2011-08-01","2024-03-01","2025-09-16"]},"708":{"dates":["2013-02-16"]},"709":{"dates":["2014-11-16","2017-04-01"]},"711":{"dates":["2012-03-01"]},"713":{"dates":["2013-06-01"]},"714":{"dates":["2015-12-01"]},"715":{"dates":["2012-07-01"]},"716":{"dates":["2013-06-01","2016-12-16"]},"718":{"dates":["2013-08-01"]},"721":{"dates":["2013-03-01"]},"722":{"dates":["2012-04-16"]},"723":{"dates":["2011-04-01","2018-03-02","2021-06-01"]},"725":{"dates":["2013-04-01"]},"726":{"dates":["2018-08-01"]},"727":{"dates":["2010-08-01"]},"728":{"dates":["2024-08-16"]},"730":{"dates":["2012-08-16"]},"731":{"dates":["2023-05-16"]},"733":{"dates":["2020-08-16"]},"734":{"dates":["2012-12-16","2013-12-01","2024-06-01"]},"736":{"dates":["2012-09-01","2025-06-16"]},"737":{"dates":["2011-03-16","2023-08-16"]},"739":{"dates":["2010-11-01","2011-12-01"]},"740":{"dates":["2017-06-16"]},"742":{"dates":["2013-12-16","2023-08-16"]},"743":{"dates":["2016-01-17","2016-03-01"]},"744":{"dates":["2010-04-16"]},"745":{"dates":["2012-08-01","2012-12-16"]},"748":{"dates":["2018-02-16","2023-03-01"]},"749":{"dates":["2012-02-01","2016-06-16"]},"750":{"dates":["2013-12-30"]},"752":{"dates":["2012-09-16","2016-11-01"]},"753":{"dates":["2013-11-16","2014-03-01"]},"754":{"dates":["2012-04-16","2013-09-16"]},"755":{"dates":["2021-11-01"]},"756":{"dates":["2010-03-16"]},"757":{"dates":["2015-03-16"]},"758":{"dates":["2011-01-16"]},"760":{"dates":["2025-04-16"]},"761":{"dates":["2015-07-16"]},"763":{"dates":["2010-11-16","2014-12-16"]},"765":{"dates":["2026-01-02"]},"766":{"dates":["2013-12-01"]},"768":{"dates":["2013-06-01"]},"769":{"dates":["2010-08-01","2016-12-30"]},"770":{"dates":["2010-05-16","2012-09-16"]},"771":{"dates":["2011-11-01"]},"773":{"dates":["2017-05-02"]},"775":{"dates":["2012-08-16","2013-03-01","2014-12-16"]},"778":{"dates":["2012-12-16","2023-11-16","2024-07-01"]},"780":{"dates":["2011-07-01","2020-03-01","2023-07-16"]},"781":{"dates":["2015-08-16","2025-03-01"]},"782":{"dates":["2013-02-01"]},"784":{"dates":["2010-09-01","2011-12-16","2014-10-16"]},"785":{"dates":["2021-08-01"]},"786":{"dates":["2016-01-17"]},"787":{"dates":["2017-08-01"]},"788":{"dates":["2022-03-16"]},"790":{"dates":["2012-06-16","2014-09-16"]},"794":{"dates":["2024-03-16"]},"795":{"dates":["2019-08-01"]},"796":{"dates":["2012-08-01"]},"797":{"dates":["2014-05-02","2019-10-01","2023-04-16"]},"798":{"dates":["2014-03-01","2021-10-16"]},"799":{"dates":["2015-05-16","2015-10-01","2022-10-16"]},"800":{"dates":["2013-09-01","2019-06-16"]},"801":{"dates":["2010-11-01","2011-06-01"]},"802":{"dates":["2015-11-16"]},"804":{"dates":["2012-11-16"]},"806":{"dates":["2021-03-01"]},"807":{"dates":["2017-04-16"]},"809":{"dates":["2020-08-01"]},"810":{"dates":["2018-10-01"]},"811":{"dates":["2010-04-16"]},"812":{"dates":["2011-09-16"]},"813":{"dates":["2015-02-01"]},"814":{"dates":["2011-08-16","2015-07-01"]},"815":{"dates":["2018-08-16"]},"816":{"dates":["2010-06-16","2022-02-17"]},"817":{"dates":["2021-02-16"]},"818":{"dates":["2015-05-02"]},"819":{"dates":["2015-09-01"]},"820":{"dates":["2012-08-01","2014-12-01"]},"821":{"dates":["2011-09-01"]},"823":{"dates":["2017-07-16"]},"824":{"dates":["2025-02-01"]},"825":{"dates":["2015-02-16"]},"826":{"dates":["2013-12-16"]},"828":{"dates":["2013-04-16","2019-05-16"]},"830":{"dates":["2013-05-02","2015-07-16","2019-03-01"]},"832":{"dates":["2012-12-30"]},"833":{"dates":["2024-05-02"]},"834":{"dates":["2013-04-16","2020-12-01","2025-08-16"]},"835":{"dates":["2014-04-01"]},"836":{"dates":["2017-01-17"]},"837":{"dates":["2019-03-01","2026-03-01"]},"843":{"dates":["2015-02-16"]},"844":{"dates":["2021-11-16"]},"847":{"dates":["2011-09-01"]},"848":{"dates":["2014-10-16"]},"849":{"dates":["2023-01-17"]},"851":{"dates":["2015-05-16"]},"852":{"dates":["2016-04-01"]},"853":{"dates":["2014-12-30","2020-09-16"]},"855":{"dates":["2014-11-01","2022-12-16"]},"857":{"dates":["2011-12-01","2015-03-01"]},"860":{"dates":["2013-03-16"]},"861":{"dates":["2015-04-01"]},"862":{"dates":["2013-04-16"]},"864":{"dates":["2012-12-30","2014-07-01"]},"868":{"dates":["2012-10-16","2018-06-16"]},"870":{"dates":["2022-04-01"]},"871":{"dates":["2016-08-01"]},"872":{"dates":["2010-10-16"]},"873":{"dates":["2012-10-01"]},"874":{"dates":["2023-06-16"]},"876":{"dates":["2013-10-16","2015-06-02","2018-11-16","2022-08-16"]},"877":{"dates":["2015-01-16","2019-03-16"]},"878":{"dates":["2021-01-17"]},"879":{"dates":["2019-02-16"]},"880":{"dates":["2013-08-01","2016-06-01"]},"881":{"dates":["2017-06-01","2024-12-16"]},"882":{"dates":["2023-12-30"]},"884":{"dates":["2018-12-30"]},"888":{"dates":["2014-02-01"]},"889":{"dates":["2011-05-16","2015-08-01","2025-10-16"]},"891":{"dates":["2025-08-01"]},"893":{"dates":["2010-07-01"]},"895":{"dates":["2012-06-01","2015-12-30"]},"897":{"dates":["2012-07-16"]},"901":{"dates":["2014-12-16"]},"902":{"dates":["2012-05-16"]},"903":{"dates":["2013-07-01"]},"904":{"dates":["2013-07-01","2014-03-16"]},"906":{"dates":["2012-02-16","2013-04-16"]},"907":{"dates":["2010-11-16"]},"910":{"dates":["2014-10-16"]},"912":{"dates":["2014-08-16","2014-09-01"]},"918":{"dates":["2010-07-01","2020-02-16","2025-07-01"]},"919":{"dates":["2024-10-16"]},"922":{"dates":["2011-12-01","2022-11-01"]},"923":{"dates":["2017-05-02"]},"924":{"dates":["2018-04-01","2020-12-30"]},"925":{"dates":["2016-07-16","2019-09-16"]},"926":{"dates":["2011-03-01"]},"927":{"dates":["2020-02-01","2021-07-16"]},"928":{"dates":["2015-05-16"]},"933":{"dates":["2010-12-30"]},"936":{"dates":["2010-12-30"]},"937":{"dates":["2016-06-01"]},"938":{"dates":["2014-04-01","2017-12-16"]},"939":{"dates":["2019-09-16"]},"940":{"dates":["2012-10-01"]},"941":{"dates":["2012-01-16","2017-03-16"]},"944":{"dates":["2014-07-16"]},"945":{"dates":["2011-03-16","2011-05-02","2013-05-16","2013-08-16","2017-08-16"]},"947":{"dates":["2023-07-01","2024-04-01"]},"948":{"dates":["2019-02-01"]},"950":{"dates":["2014-12-30"]},"952":{"dates":["2013-10-16","2017-10-01"]},"953":{"dates":["2017-02-16","2017-12-30"]},"954":{"dates":["2026-03-16"]},"957":{"dates":["2011-10-01","2020-09-01"]},"959":{"dates":["2013-03-16"]},"961":{"dates":["2010-07-01","2023-11-16"]},"962":{"dates":["2015-04-01"]},"964":{"dates":["2023-12-16"]},"965":{"dates":["2025-05-16"]},"966":{"dates":["2019-04-16"]},"968":{"dates":["2010-11-01","2019-04-16"]},"969":{"dates":["2015-06-02"]},"970":{"dates":["2021-05-16","2023-10-16"]},"971":{"dates":["2023-06-01"]},"972":{"dates":["2013-03-01"]},"973":{"dates":["2015-04-16","2016-03-16","2022-11-16"]},"975":{"dates":["2019-04-01"]},"976":{"dates":["2014-02-01"]},"978":{"dates":["2021-06-01"]},"979":{"dates":["2010-11-16","2014-11-01"]},"980":{"dates":["2013-12-01","2020-10-16","2024-11-16"]},"982":{"dates":["2014-12-30"]},"984":{"dates":["2020-12-01","2023-03-01"]},"986":{"dates":["2010-08-16"]},"988":{"dates":["2018-12-01"]},"989":{"dates":["2017-08-01","2022-03-16","2025-08-16"]},"991":{"dates":["2011-10-16"]},"993":{"dates":["2011-11-16"]},"995":{"dates":["2025-12-01"]},"996":{"dates":["2010-03-16","2010-06-01","2010-10-01"]},"040":{"dates":["2010-04-01","2010-05-02","2011-04-01"]},"008":{"dates":["2010-05-16","2012-12-16","2015-02-01","2015-03-01","2024-09-16"]},"024":{"dates":["2010-07-16"]},"096":{"dates":["2010-09-01"]},"075":{"dates":["2010-09-16","2013-07-01"]},"091":{"dates":["2010-10-01"]},"003":{"dates":["2010-10-01"]},"086":{"dates":["2010-12-01","2014-10-01"]},"036":{"dates":["2011-04-01","2017-11-01"]},"044":{"dates":["2011-05-16","2025-06-01"]},"071":{"dates":["2011-05-16"]},"052":{"dates":["2011-07-16","2017-03-01"]},"074":{"dates":["2011-08-16","2012-04-01","2013-12-01","2014-02-16"]},"005":{"dates":["2011-08-16","2017-07-01"]},"021":{"dates":["2011-09-01","2019-11-01"]},"057":{"dates":["2011-10-16","2021-02-16","2023-09-16"]},"065":{"dates":["2011-11-01"]},"026":{"dates":["2011-12-30"]},"088":{"dates":["2012-04-16"]},"042":{"dates":["2012-07-16"]},"032":{"dates":["2012-08-16","2016-10-16"]},"089":{"dates":["2012-10-16"]},"034":{"dates":["2013-05-16"]},"098":{"dates":["2013-06-16","2024-12-01"]},"045":{"dates":["2013-09-01","2020-10-16"]},"056":{"dates":["2013-09-16"]},"028":{"dates":["2013-10-01"]},"020":{"dates":["2013-11-01"]},"069":{"dates":["2013-11-16"]},"077":{"dates":["2014-01-16"]},"013":{"dates":["2014-04-16","2019-12-01"]},"080":{"dates":["2014-12-16"]},"068":{"dates":["2015-01-16","2015-09-01","2026-03-01"]},"083":{"dates":["2015-02-01"]},"031":{"dates":["2015-03-01"]},"081":{"dates":["2015-07-01"]},"084":{"dates":["2015-09-16","2025-07-16"]},"054":{"dates":["2015-10-16","2016-02-01"]},"094":{"dates":["2015-12-17","2020-07-01","2024-09-01"]},"076":{"dates":["2016-02-01","2018-04-16"]},"004":{"dates":["2016-03-16","2021-08-01"]},"046":{"dates":["2016-05-02","2018-11-01"]},"087":{"dates":["2016-05-16"]},"043":{"dates":["2016-09-16"]},"017":{"dates":["2016-10-01"]},"038":{"dates":["2016-11-01"]},"047":{"dates":["2018-05-16"]},"097":{"dates":["2018-09-01"]},"018":{"dates":["2019-05-16"]},"006":{"dates":["2019-07-01"]},"085":{"dates":["2019-11-16"]},"030":{"dates":["2020-02-16"]},"062":{"dates":["2020-11-01"]},"072":{"dates":["2020-12-16"]},"051":{"dates":["2021-03-01"]},"007":{"dates":["2021-09-16"]},"041":{"dates":["2022-05-02","2026-02-01"]},"002":{"dates":["2022-07-01"]},"061":{"dates":["2022-07-16"]},"066":{"dates":["2023-07-16"]},"019":{"dates":["2023-11-01"]},"092":{"dates":["2023-12-01"]},"070":{"dates":["2024-05-16","2024-08-01"]},"079":{"dates":["2024-10-01"]},"063":{"dates":["2024-11-01"]},"001":{"dates":["2025-02-16"]},"022":{"dates":["2025-09-01"]},"014":{"dates":["2025-12-16"]}},"last2":{"10":{"dates":["2010-08-01","2018-08-16","2022-04-01"]},"11":{"dates":["2010-09-01","2012-07-16","2014-12-01","2023-07-31"]},"12":{"dates":["2010-05-16","2011-07-16","2011-08-01"]},"14":{"dates":["2013-10-01","2016-06-01","2017-02-16","2021-05-16","2022-08-01","2022-12-16","2023-11-16"]},"15":{"dates":["2011-10-01","2012-11-16","2019-10-16","2021-01-17","2022-10-16"]},"16":{"dates":["2018-11-16","2023-07-01","2026-01-02"]},"17":{"dates":["2021-06-16","2024-05-02"]},"18":{"dates":["2012-02-16","2014-06-01","2021-05-02"]},"19":{"dates":["2020-12-30","2021-03-16"]},"20":{"dates":["2013-08-16","2014-05-16","2018-05-16","2019-09-01","2025-06-01"]},"21":{"dates":["2011-12-16","2024-07-16","2024-12-16"]},"22":{"dates":["2010-04-01","2014-09-01","2020-04-01","2025-12-01"]},"23":{"dates":["2011-01-16","2019-04-16","2021-08-16","2025-01-17"]},"24":{"dates":["2010-12-16","2020-06-01"]},"25":{"dates":["2014-11-16","2017-01-17","2019-05-02"]},"26":{"dates":["2014-04-16","2015-07-01","2017-07-01","2018-09-01","2025-07-16"]},"27":{"dates":["2011-02-16","2013-12-01","2018-07-16"]},"28":{"dates":["2011-09-16","2012-08-16","2012-10-16","2013-11-16","2024-08-16"]},"29":{"dates":["2012-05-02","2018-03-02","2019-06-16","2021-07-01"]},"30":{"dates":["2015-05-02","2022-02-01","2023-06-16"]},"31":{"dates":["2012-05-16","2018-02-01","2024-06-16","2025-09-01"]},"32":{"dates":["2012-02-01","2016-03-16","2019-11-16","2024-11-01","2025-03-16"]},"33":{"dates":["2016-08-16","2016-10-01","2017-12-01"]},"34":{"dates":["2010-07-16","2015-03-01"]},"35":{"dates":["2014-03-01","2014-09-16","2016-12-16","2017-05-02"]},"36":{"dates":["2017-08-01","2021-12-30","2025-04-01"]},"37":{"dates":["2013-03-01","2017-08-16","2024-09-16","2025-11-16"]},"38":{"dates":["2012-06-01","2015-04-16","2015-05-16","2020-10-16","2021-10-16","2024-11-16"]},"39":{"dates":["2014-07-01","2018-02-16","2021-02-16"]},"40":{"dates":["2015-08-16","2017-04-16","2020-11-01"]},"42":{"dates":["2010-10-16","2016-09-16","2017-02-01","2022-08-16","2024-06-01"]},"43":{"dates":["2010-11-16","2012-12-01","2024-02-16"]},"44":{"dates":["2011-04-16","2014-10-01","2014-11-01","2016-11-16","2023-10-16"]},"45":{"dates":["2014-07-16","2015-11-01","2021-06-01"]},"46":{"dates":["2011-06-01","2016-12-30","2018-06-16","2019-06-01","2020-11-16","2023-09-16","2024-08-01"]},"47":{"dates":["2013-11-01","2017-06-16","2023-01-17"]},"48":{"dates":["2013-12-30","2026-02-01"]},"49":{"dates":["2010-12-30","2015-07-16"]},"50":{"dates":["2012-08-01","2016-01-17","2018-01-17","2022-10-01","2025-02-16","2025-08-01"]},"51":{"dates":["2011-07-01","2012-06-16","2013-07-01","2025-01-02","2025-02-01"]},"52":{"dates":["2013-03-16","2014-01-16","2014-05-02","2017-10-01","2019-04-01","2025-12-16"]},"53":{"dates":["2013-04-01","2015-08-01","2016-07-01","2017-05-16","2020-07-16","2022-07-16"]},"54":{"dates":["2011-11-01","2025-03-01"]},"55":{"dates":["2011-02-01","2016-07-16","2023-03-01"]},"56":{"dates":["2013-05-16","2019-02-16","2021-04-16"]},"57":{"dates":["2011-11-16","2014-12-30","2016-08-01","2020-09-16","2021-11-16","2022-02-17"]},"58":{"dates":["2012-10-01","2018-11-01","2019-08-01","2022-04-16","2022-12-30","2025-09-16"]},"59":{"dates":["2010-11-01","2019-10-01","2020-10-01","2024-10-01"]},"60":{"dates":["2012-07-01","2013-10-16","2018-04-16","2024-05-16"]},"61":{"dates":["2017-06-01","2022-07-01","2024-01-17","2024-12-01","2025-10-16"]},"62":{"dates":["2011-08-16","2012-04-16","2015-10-16","2016-09-01","2018-12-16","2023-07-16"]},"63":{"dates":["2012-11-01","2013-09-16","2023-11-01","2025-08-16"]},"64":{"dates":["2010-08-16","2019-03-16","2020-06-16","2022-11-16","2026-03-16"]},"65":{"dates":["2011-12-30","2015-06-02","2017-09-01","2019-01-17","2019-03-01","2023-05-02"]},"66":{"dates":["2010-09-16","2013-02-01","2023-10-01"]},"67":{"dates":["2018-12-01","2023-08-16"]},"68":{"dates":["2010-07-01","2020-01-17"]},"69":{"dates":["2012-04-01","2013-06-16","2021-08-01"]},"70":{"dates":["2015-04-01","2020-12-16","2021-07-16","2022-11-01"]},"71":{"dates":["2017-09-16","2019-05-16","2023-04-16"]},"72":{"dates":["2012-12-16"]},"73":{"dates":["2010-06-16","2021-03-01","2023-03-16"]},"74":{"dates":["2015-01-16"]},"75":{"dates":["2022-09-16"]},"77":{"dates":["2016-12-01","2020-03-16","2025-10-01"]},"78":{"dates":["2015-12-01","2017-03-01","2018-08-01","2024-03-16"]},"79":{"dates":["2012-03-01","2012-09-16","2013-12-16","2014-03-16","2015-02-01","2016-06-16","2018-09-16","2019-11-01","2021-09-01","2024-03-01","2024-04-16"]},"80":{"dates":["2017-04-01","2023-02-16"]},"81":{"dates":["2010-06-01","2012-01-16","2019-12-01","2019-12-30"]},"82":{"dates":["2013-08-01","2014-08-01","2018-03-16","2021-12-01"]},"83":{"dates":["2011-10-16","2018-07-01","2020-07-01","2021-10-01","2021-12-16","2022-09-01"]},"84":{"dates":["2020-12-01"]},"85":{"dates":["2011-05-02","2011-09-01","2017-11-01","2018-04-01","2018-05-02","2019-09-16","2023-12-16","2025-04-16"]},"86":{"dates":["2013-04-16","2013-07-16","2016-11-01","2017-10-16","2019-07-01"]},"87":{"dates":["2016-04-16","2017-07-16","2025-05-16","2025-11-01"]},"88":{"dates":["2011-06-16","2019-07-15","2020-08-16"]},"89":{"dates":["2015-09-01","2017-12-16","2019-08-16","2023-12-30","2024-07-01"]},"90":{"dates":["2013-06-01","2014-12-16","2015-02-16","2021-09-16","2024-04-01"]},"91":{"dates":["2014-08-16","2023-09-01","2023-12-01","2025-07-01"]},"92":{"dates":["2015-03-16","2016-04-01","2017-03-16","2020-08-01","2022-01-17","2022-06-16","2023-02-01"]},"93":{"dates":["2018-10-16"]},"94":{"dates":["2014-10-16","2020-02-16","2024-09-01"]},"95":{"dates":["2014-02-01","2014-04-01","2014-06-16","2018-06-01","2021-11-01"]},"96":{"dates":["2010-04-16","2011-03-16"]},"97":{"dates":["2010-03-01","2010-03-16","2011-03-01","2019-12-16","2021-02-01"]},"98":{"dates":["2016-02-16","2016-05-16","2016-10-16","2017-11-16","2017-12-30","2020-03-01","2020-09-01"]},"99":{"dates":["2018-10-01","2023-04-01","2023-05-16"]},"06":{"dates":["2010-05-02","2015-09-16","2016-03-01","2020-02-01","2022-05-16","2025-05-02","2025-06-16","2026-03-01"]},"02":{"dates":["2010-10-01","2011-12-01","2015-12-30","2016-05-02","2018-12-30","2022-06-01","2026-01-17"]},"09":{"dates":["2010-12-01","2013-02-16","2016-02-01","2022-05-02","2023-06-01","2024-02-01"]},"01":{"dates":["2011-04-01","2014-02-16"]},"05":{"dates":["2011-05-16","2013-09-01","2015-06-16","2021-04-01"]},"08":{"dates":["2012-03-16","2013-01-16","2015-12-17","2022-12-01"]},"07":{"dates":["2012-09-01","2013-05-02","2015-10-01","2022-03-01","2026-02-16"]},"00":{"dates":["2012-12-30","2024-10-16"]},"03":{"dates":["2015-11-16","2022-03-16"]},"04":{"dates":["2019-02-01"]}},"allDates":["2010-03-01","2010-03-16","2010-04-01","2010-04-16","2010-05-02","2010-05-16","2010-06-01","2010-06-16","2010-07-01","2010-07-16","2010-08-01","2010-08-16","2010-09-01","2010-09-16","2010-10-01","2010-10-16","2010-11-01","2010-11-16","2010-12-01","2010-12-16","2010-12-30","2011-01-16","2011-02-01","2011-02-16","2011-03-01","2011-03-16","2011-04-01","2011-04-16","2011-05-02","2011-05-16","2011-06-01","2011-06-16","2011-07-01","2011-07-16","2011-08-01","2011-08-16","2011-09-01","2011-09-16","2011-10-01","2011-10-16","2011-11-01","2011-11-16","2011-12-01","2011-12-16","2011-12-30","2012-01-16","2012-02-01","2012-02-16","2012-03-01","2012-03-16","2012-04-01","2012-04-16","2012-05-02","2012-05-16","2012-06-01","2012-06-16","2012-07-01","2012-07-16","2012-08-01","2012-08-16","2012-09-01","2012-09-16","2012-10-01","2012-10-16","2012-11-01","2012-11-16","2012-12-01","2012-12-16","2012-12-30","2013-01-16","2013-02-01","2013-02-16","2013-03-01","2013-03-16","2013-04-01","2013-04-16","2013-05-02","2013-05-16","2013-06-01","2013-06-16","2013-07-01","2013-07-16","2013-08-01","2013-08-16","2013-09-01","2013-09-16","2013-10-01","2013-10-16","2013-11-01","2013-11-16","2013-12-01","2013-12-16","2013-12-30","2014-01-16","2014-02-01","2014-02-16","2014-03-01","2014-03-16","2014-04-01","2014-04-16","2014-05-02","2014-05-16","2014-06-01","2014-06-16","2014-07-01","2014-07-16","2014-08-01","2014-08-16","2014-09-01","2014-09-16","2014-10-01","2014-10-16","2014-11-01","2014-11-16","2014-12-01","2014-12-16","2014-12-30","2015-01-16","2015-02-01","2015-02-16","2015-03-01","2015-03-16","2015-04-01","2015-04-16","2015-05-02","2015-05-16","2015-06-02","2015-06-16","2015-07-01","2015-07-16","2015-08-01","2015-08-16","2015-09-01","2015-09-16","2015-10-01","2015-10-16","2015-11-01","2015-11-16","2015-12-01","2015-12-17","2015-12-30","2016-01-17","2016-02-01","2016-02-16","2016-03-01","2016-03-16","2016-04-01","2016-04-16","2016-05-02","2016-05-16","2016-06-01","2016-06-16","2016-07-01","2016-07-16","2016-08-01","2016-08-16","2016-09-01","2016-09-16","2016-10-01","2016-10-16","2016-11-01","2016-11-16","2016-12-01","2016-12-16","2016-12-30","2017-01-17","2017-02-01","2017-02-16","2017-03-01","2017-03-16","2017-04-01","2017-04-16","2017-05-02","2017-05-16","2017-06-01","2017-06-16","2017-07-01","2017-07-16","2017-08-01","2017-08-16","2017-09-01","2017-09-16","2017-10-01","2017-10-16","2017-11-01","2017-11-16","2017-12-01","2017-12-16","2017-12-30","2018-01-17","2018-02-01","2018-02-16","2018-03-02","2018-03-16","2018-04-01","2018-04-16","2018-05-02","2018-05-16","2018-06-01","2018-06-16","2018-07-01","2018-07-16","2018-08-01","2018-08-16","2018-09-01","2018-09-16","2018-10-01","2018-10-16","2018-11-01","2018-11-16","2018-12-01","2018-12-16","2018-12-30","2019-01-17","2019-02-01","2019-02-16","2019-03-01","2019-03-16","2019-04-01","2019-04-16","2019-05-02","2019-05-16","2019-06-01","2019-06-16","2019-07-01","2019-07-15","2019-08-01","2019-08-16","2019-09-01","2019-09-16","2019-10-01","2019-10-16","2019-11-01","2019-11-16","2019-12-01","2019-12-16","2019-12-30","2020-01-17","2020-02-01","2020-02-16","2020-03-01","2020-03-16","2020-04-01","2020-06-01","2020-06-16","2020-07-01","2020-07-16","2020-08-01","2020-08-16","2020-09-01","2020-09-16","2020-10-01","2020-10-16","2020-11-01","2020-11-16","2020-12-01","2020-12-16","2020-12-30","2021-01-17","2021-02-01","2021-02-16","2021-03-01","2021-03-16","2021-04-01","2021-04-16","2021-05-02","2021-05-16","2021-06-01","2021-06-16","2021-07-01","2021-07-16","2021-08-01","2021-08-16","2021-09-01","2021-09-16","2021-10-01","2021-10-16","2021-11-01","2021-11-16","2021-12-01","2021-12-16","2021-12-30","2022-01-17","2022-02-01","2022-02-17","2022-03-01","2022-03-16","2022-04-01","2022-04-16","2022-05-02","2022-05-16","2022-06-01","2022-06-16","2022-07-01","2022-07-16","2022-08-01","2022-08-16","2022-09-01","2022-09-16","2022-10-01","2022-10-16","2022-11-01","2022-11-16","2022-12-01","2022-12-16","2022-12-30","2023-01-17","2023-02-01","2023-02-16","2023-03-01","2023-03-16","2023-04-01","2023-04-16","2023-05-02","2023-05-16","2023-06-01","2023-06-16","2023-07-01","2023-07-16","2023-07-31","2023-08-16","2023-09-01","2023-09-16","2023-10-01","2023-10-16","2023-11-01","2023-11-16","2023-12-01","2023-12-16","2023-12-30","2024-01-17","2024-02-01","2024-02-16","2024-03-01","2024-03-16","2024-04-01","2024-04-16","2024-05-02","2024-05-16","2024-06-01","2024-06-16","2024-07-01","2024-07-16","2024-08-01","2024-08-16","2024-09-01","2024-09-16","2024-10-01","2024-10-16","2024-11-01","2024-11-16","2024-12-01","2024-12-16","2025-01-02","2025-01-17","2025-02-01","2025-02-16","2025-03-01","2025-03-16","2025-04-01","2025-04-16","2025-05-02","2025-05-16","2025-06-01","2025-06-16","2025-07-01","2025-07-16","2025-08-01","2025-08-16","2025-09-01","2025-09-16","2025-10-01","2025-10-16","2025-11-01","2025-11-16","2025-12-01","2025-12-16","2026-01-02","2026-01-17","2026-02-01","2026-02-16","2026-03-01","2026-03-16"]};
+    const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const CL = ['#0d1117','#0a2e1a','#0e4429','#006d32','#26a641','#39d353','#7ee787','#aff5b4','#d4f5a6','#f0f9c4'];
+
+    let type='last3f', view='month', selNum=null, freq={}, dmap={}, gmax=0;
+
+    const hc  = (v,m) => !v||!m ? CL[0] : CL[Math.min(Math.ceil(v/m*(CL.length-1)),CL.length-1)];
+    const axK = d => view==='month' ? d.split('-')[1] : d.split('-')[0];
+    const axL = k => view==='month' ? (MN[parseInt(k)-1]||k) : k;
+
+    /* ── toggle panel on mobile ── */
+    let panelOpen = true;
+    function togglePanel(){
+      panelOpen = !panelOpen;
+      const body = document.getElementById('num-body');
+      const btn  = document.getElementById('panel-toggle');
+      body.classList.toggle('collapsed', !panelOpen);
+      btn.textContent = panelOpen ? '▾' : '▸';
+    }
+
+    /* ── build data ── */
+    function getData(){
+      const td=D[type], yf=document.getElementById('year-filter').value;
+      const ns=document.getElementById('number-search').value.trim();
+      const isL2=type==='last2', maxN=isL2?100:1000, pad=isL2?2:3;
+      const mx={},dm={},fm={},ak=new Set(),ds=new Set();
+      for(const [n,e] of Object.entries(td)){
+        const fd=yf==='all'?e.dates:e.dates.filter(d=>d.startsWith(yf));
+        if(!fd.length) continue;
+        dm[n]=fd; fm[n]=fd.length; mx[n]={};
+        for(const d of fd){ds.add(d);const k=axK(d);ak.add(k);mx[n][k]=(mx[n][k]||0)+1;}
+      }
+      let nl=[];
+      for(let i=0;i<maxN;i++) nl.push(i.toString().padStart(pad,'0'));
+      if(ns) nl=nl.filter(n=>n.includes(ns));
+      return{mx,dm,fm,nl,ak:Array.from(ak).sort(),draws:ds.size};
+    }
+
+    /* ── render heatmap ── */
+    function render(){
+      const{mx,dm,fm,nl,ak,draws}=getData();
+      freq=fm; dmap=dm; gmax=0; let hot='—';
+      for(const[n,c] of Object.entries(fm)) if(c>gmax){gmax=c;hot=n;}
+      document.getElementById('s-draws').textContent=draws;
+      document.getElementById('s-nums').textContent=nl.length;
+      document.getElementById('s-hot').textContent=hot;
+      document.getElementById('s-max').textContent=gmax;
+      buildLegend();
+
+      const tbl=document.createElement('table');
+      const hr=tbl.createTHead().insertRow();
+      const h0=document.createElement('th'); h0.textContent='#'; hr.appendChild(h0);
+      for(const k of ak){const th=document.createElement('th');th.textContent=axL(k);hr.appendChild(th);}
+
+      const tb=tbl.createTBody();
+      for(const n of nl){
+        const row=tb.insertRow();
+        if(n===selNum) row.classList.add('hl');
+        const th=document.createElement('th');
+        th.textContent=n; th.scope='row'; th.title='Click for dates';
+        th.addEventListener('click',()=>openModal(n));
+        row.appendChild(th);
+        for(const k of ak){
+          const c=(mx[n]&&mx[n][k])||0;
+          const td=row.insertCell();
+          td.style.background=hc(c,gmax);
+          if(!c) td.classList.add('z');
+          td.dataset.n=n; td.dataset.k=k; td.dataset.c=c;
+        }
+      }
+      const el=document.getElementById('heatmap');
+      el.innerHTML=''; el.appendChild(tbl);
+      tooltips(tbl,ak); renderList();
+    }
+
+    /* ── number list ── */
+    function renderList(){
+      const isL2=type==='last2', maxN=isL2?100:1000, pad=isL2?2:3;
+      const s=(document.getElementById('list-search').value||'').trim();
+      const max=gmax||1;
+      document.getElementById('list-title').textContent=isL2?'Numbers (00–99)':'Numbers (000–999)';
+      const grid=document.getElementById('num-grid');
+      grid.style.gridTemplateColumns='repeat('+(isL2?4:5)+',1fr)';
+      let h='';
+      for(let i=0;i<maxN;i++){
+        const n=i.toString().padStart(pad,'0');
+        if(s&&!n.includes(s)) continue;
+        const c=freq[n]||0;
+        const cls=(c>=max*.7?' hot':c>=max*.35?' warm':'')+(n===selNum?' active':'');
+        h+='<button class="nb'+cls+'" data-n="'+n+'" title="'+n+': '+c+'">'
+          +'<span class="nb-n">'+n+'</span><span class="nb-c">'+c+'</span></button>';
+      }
+      grid.innerHTML=h;
+      grid.onclick=function(e){
+        const btn=e.target.closest('[data-n]');
+        if(!btn) return;
+        const n=btn.dataset.n;
+        selNum=n; openModal(n);
+        document.querySelectorAll('#heatmap tbody tr').forEach(r=>{
+          const th=r.querySelector('th');
+          if(th) r.classList.toggle('hl',th.textContent===n);
+        });
+        renderList();
+      };
+    }
+
+    /* ── date modal ── */
+    function openModal(n){
+      selNum=n; renderList();
+      const dates=(dmap[n]||[]).slice().sort(), total=dates.length;
+      const lbl=type==='last2'?'Last 2':type==='last3f'?'Last 3 Front':'Last 3 Back';
+      document.getElementById('m-num').textContent=n;
+      document.getElementById('m-meta').innerHTML='<strong>'+lbl+'</strong><br/>'+total+' appearance'+(total!==1?'s':'')+' in current filter';
+      const body=document.getElementById('m-body');
+      if(!total){body.innerHTML='<div class="m-empty">No appearances for <strong>'+n+'</strong>.</div>';
+        document.getElementById('overlay').classList.add('open'); return;}
+      const by={};
+      for(const d of dates){const y=d.split('-')[0];if(!by[y])by[y]=[];by[y].push(d);}
+      let h='';
+      for(const y of Object.keys(by).sort()){
+        const yd=by[y];
+        const ch=yd.map(d=>{const p=d.split('-');return'<span class="chip" title="'+d+'">'+p[2]+' '+MN[parseInt(p[1])-1]+' '+p[0]+'</span>';}).join('');
+        h+='<div class="yr-group"><div class="yr-title">'+y+' — '+yd.length+' draw'+(yd.length!==1?'s':'')+'</div><div class="chips">'+ch+'</div></div>';
+      }
+      body.innerHTML=h;
+      document.getElementById('overlay').classList.add('open');
+    }
+    function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+    /* ── legend ── */
+    function buildLegend(){
+      const sc=document.getElementById('legend'); sc.innerHTML='';
+      CL.forEach((c,i)=>{const sw=document.createElement('div');sw.className='l-sw';sw.style.background=c;sw.title=Math.round(i/(CL.length-1)*gmax)+' appearances';sc.appendChild(sw);});
+    }
+
+    /* ── tooltips ── */
+    function tooltips(tbl,ak){
+      const tip=document.getElementById('tip');
+      tbl.addEventListener('mousemove',e=>{
+        const td=e.target.closest('td');
+        if(!td||!td.dataset.n){tip.style.display='none';return;}
+        const n=td.dataset.n,c=+td.dataset.c,t=freq[n]||0,avg=t>0?(t/ak.length).toFixed(2):'0';
+        tip.innerHTML='<strong>'+n+'</strong>'
+          +'<div class="tr"><span>'+(view==='month'?'Month':'Year')+'</span><span>'+axL(td.dataset.k)+'</span></div>'
+          +'<div class="tr"><span>Appearances</span><span>'+c+'</span></div>'
+          +'<div class="tr"><span>Total</span><span>'+t+'</span></div>'
+          +'<div class="tr"><span>Avg/period</span><span>'+avg+'</span></div>'
+          +'<div style="margin-top:5px;font-size:10px;color:var(--muted)">Click row to see all dates</div>';
+        tip.style.display='block';
+        tip.style.left=(e.clientX+14)+'px';
+        tip.style.top=(e.clientY-10)+'px';
+      });
+      tbl.addEventListener('mouseleave',()=>{ tip.style.display='none'; });
+    }
+
+    /* ── tab switches ── */
+    function switchType(t){
+      type=t; selNum=null;
+      ['last3f','last3b','last2'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('active',x===t));
+      render();
+    }
+    function switchView(v){
+      view=v;
+      ['month','year'].forEach(x=>document.getElementById('vtab-'+x).classList.toggle('active',x===v));
+      render();
+    }
+
+    /* ── theme ── */
+    function setTheme(t){
+      document.documentElement.dataset.theme=t;
+      localStorage.setItem('hm-theme',t);
+      ['dark','light','system'].forEach(x=>{
+        document.getElementById('theme-'+x).classList.toggle('active',x===t);
+      });
+    }
+    function initTheme(){
+      const saved=localStorage.getItem('hm-theme')||'dark';
+      setTheme(saved);
+    }
+
+    /* ── init ── */
+    (function(){
+      initTheme();
+      const years=new Set(D.allDates.map(d=>d.split('-')[0]));
+      const sel=document.getElementById('year-filter');
+      Array.from(years).sort().forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y;sel.appendChild(o);});
+      render();
+    })();
+  </script>
+</body>
+</html>
